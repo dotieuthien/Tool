@@ -1,0 +1,30 @@
+{
+  "imagePathRight": "/home/hades/Desktop/rnd_cv/LabelComponent/data/05_ggg05_s02_010_r2S_T_A_CHS_NON/color/0007.tga", 
+  "imagePathLeft": "/home/hades/Desktop/rnd_cv/LabelComponent/data/05_ggg05_s02_010_r2S_T_A_CHS_NON/color/0006.tga", 
+  "pairs": {
+    "40_35": {
+      "right": 35, 
+      "left": 40
+    }, 
+    "15_12": {
+      "right": 12, 
+      "left": 15
+    }, 
+    "42_37": {
+      "right": 37, 
+      "left": 42
+    }, 
+    "50_44": {
+      "right": 44, 
+      "left": 50
+    }, 
+    "26_22": {
+      "right": 22, 
+      "left": 26
+    }, 
+    "47_42": {
+      "right": 42, 
+      "left": 47
+    }
+  }
+}
