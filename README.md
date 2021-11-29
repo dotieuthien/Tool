@@ -1,12 +1,13 @@
-labelme: Image Annotation Tool with Python
+LabelComponent
 ==========================================
 
 Requirements
 ------------
 
 - Ubuntu
-- Python2
+- Python3
 - [PyQt5](http://www.riverbankcomputing.co.uk/software/pyqt/intro)
+- labelme3.yml
 
 
 Installation
@@ -15,10 +16,10 @@ Installation
 You need install [Anaconda](https://www.continuum.io/downloads), then run below:
 
 ```
-# Python2
-cd $root_dir_of_labelme
-conda create --name=labelme python=2.7
-source activate labelme
+# Python3
+cd $root_dir_to_LabelComponent
+conda create --name=labelme3 python=3.6
+conda activate labelme3
 conda install pyqt
 pip install labelme
 ```
