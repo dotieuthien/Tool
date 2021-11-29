@@ -38,8 +38,8 @@ from labelme.colorDialog import ColorDialog
 from labelme.labelFile import LabelFile, LabelFileError
 from labelme.toolBar import ToolBar
 from labelme.canvas2 import Canvas2
-from labelme.matching_wrapper import predict_matching
-from labelme.components import extract_component_from_mask
+from labelme.matching import predict_matching, ucn_matching
+from labelme.components import extract_component_from_mask, extract_component_from_image
 
 
 __appname__ = 'LabelComponent'
@@ -473,6 +473,7 @@ class MainWindow(QMainWindow, WindowMixin):
         return None
 
     def addRecentFile(self, filename):
+        logging.info('Add %s to Recent Files' % filename)
         if filename in self.recentFiles:
             self.recentFiles.remove(filename)
 
@@ -578,7 +579,7 @@ class MainWindow(QMainWindow, WindowMixin):
             return os.path.exists(str(filename))
 
         menu = self.menus.recentFiles
-        menu.clear()
+        # menu.clear()
         files = [f for f in self.recentFiles if f != current and exists(f)]
 
         for i, f in enumerate(files):
@@ -626,15 +627,18 @@ class MainWindow(QMainWindow, WindowMixin):
             self.imgCnt = item_index
             self.canvas2.imgCnt = self.imgCnt
             self.imageList.setCurrentRow(self.imgCnt)
+            logging.info('Load File from Click Image')
             self.loadFile(self.list_pair[self.imgCnt])
             self.setCreateMode()
             self.canvas2.update()
 
     def clickLabel(self):
+        logging.info('Click Label List')
         # Delete mode
         if self.canvas2.mode == 1:
             logging.info('Click Label in mode 1 (delete mode)')
             item = self.currentItem()
+
             for item_, pair in self.itemsToShapes:
                 if item_ == item:
                     self.canvas2.selectedComponent1 = pair['left']
@@ -671,10 +675,10 @@ class MainWindow(QMainWindow, WindowMixin):
                     self.canvas2.pressedLeft = False
 
     def _saveLabels(self, outputFile):
-        logging.info('Saving label ...')
+        logging.info('Save Labels function')
         lf = LabelFile()
         pairs = self.canvas2.pairs
-        img_name_1, img_name_2 = self.list_pair[self.imgCnt - 1]
+        img_name_1, img_name_2 = self.list_pair[self.imgCnt]
 
         try:
             lf.save(outputFile, pairs, img_name_1, img_name_2, self.imageData, self.lineColor.getRgb(), self.fillColor.getRgb())
@@ -711,7 +715,7 @@ class MainWindow(QMainWindow, WindowMixin):
     #     self.updateProgress()
 
     def addZoom(self, factor):
-        logging.info('Add Zoom')
+        logging.info('Add Zoom with factor %f' %factor)
         if self.scaleFactor + factor <= 0:
             return
 
@@ -746,89 +750,13 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas2.imageLabelLeft.adjustSize()
         self.canvas2.imageLabelRight.adjustSize()
 
-    def get_line_art_value(self, image):
-        # TODO improvement
-        assert len(image.shape) == 3, 'Require RGB image, got %d' % len(image.shape)
-
-        line_colors = []
-
-        # Convert rgb image to (h, w, 1)
-        b, r, g = cv2.split(image)
-        processed_image = np.array(b + 300 * (g + 1) + 300 * 300 * (r + 1))
-        uniques = np.unique(processed_image)
-
-        for unique in uniques:
-            rows, cols = np.where(processed_image == unique)
-            image_tmp = np.zeros_like(processed_image)
-            image_tmp[rows, cols] = 255
-
-            # Get components
-            labels = measure.label(image_tmp, connectivity=1, background=0)
-
-            for region in measure.regionprops(labels, intensity_image=processed_image):
-                if region['area'] <= 10:
-                    continue
-                image_tmp_ = np.zeros_like(processed_image)
-                coord = region['coords']
-                image_tmp_[coord[:, 0], coord[:, 1]] = 255
-
-                contours = measure.find_contours(image_tmp_, 0.8)
-                if len(contours) != 1:
-                    continue
-
-                contour = np.array(contours[0], dtype=np.int)
-                color_values, counts = np.unique(processed_image[contour[:, 0], contour[:, 1]], return_counts=True)
-                line_colors.extend(color_values)
-
-                if len(line_colors) > 10:
-                    return max(set(line_colors), key=line_colors.count)
-
-        return max(set(line_colors), key=line_colors.count)
-
-    def extract_component(self, image):
-        # TODO: check again
-        assert len(image.shape) == 3, 'Require RGB image, got %d' % len(image.shape)
-        h, w, _ = image.shape
-        mask = np.ones((h, w)) * -1
-
-        b, r, g = cv2.split(image)
-        processed_image = np.array(b + 300 * (g + 1) + 300 * 300 * (r + 1))
-        uniques = np.unique(processed_image)
-
-        index = 0
-        result = {}
-        line_art_value = self.get_line_art_value(image)
-
-        for unique in uniques:
-            # Get coords by color
-            if unique == line_art_value:
-                continue
-            rows, cols = np.where(processed_image == unique)
-            image_tmp = np.zeros_like(processed_image)
-            image_tmp[rows, cols] = 255
-
-            # Get components
-            labels = measure.label(image_tmp, connectivity=1, background=0)
-
-            for region in measure.regionprops(labels, intensity_image=processed_image):
-                if region['area'] <= 10:
-                    continue
-
-                result[index] = {"centroid": np.array(region.centroid), "area": region.area,
-                                 "image": region.image.astype(np.uint8) * 255, "label": index + 1,
-                                 "coords": region.coords, "bbox": region.bbox, "min_intensity": region.min_intensity,
-                                 "mean_intensity": region.mean_intensity, "max_intensity": region.max_intensity}
-                mask[region['coords'][:, 0], region['coords'][:, 1]] = index
-                index += 1
-        return result, mask
-
     def create_pair(self):
         # Save pair into pairs
         value = str(self.canvas2.selectedComponent1) + '_' + str(self.canvas2.selectedComponent2)
         self.canvas2.pairs[value] = self.canvas2.pair
         self.labelList.clear()
         self.loadLabels(self.canvas2.pairs)
-        values = self.canvas2.pairs.keys()
+        values = list(self.canvas2.pairs.keys())
         index = values.index(value)
         self.labelList.setCurrentRow(index)
 
@@ -895,7 +823,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.list_pair = list_pair
 
-        # Add list pair to show in dock
+        # Add list pair to show in bottom-right dock
         self.imageList.clear()
         for img_path1, img_path2 in self.list_pair:
             name1 = os.path.basename(img_path1)
@@ -908,7 +836,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas2.imgCnt = self.imgCnt
 
         # Load pair
-        self.loadFile(self.list_pair[self.imgCnt])
+        # self.loadFile(self.list_pair[self.imgCnt])
 
         # Init actions
         self.actions.next_image.setEnabled(True)
@@ -989,23 +917,27 @@ class MainWindow(QMainWindow, WindowMixin):
             if not os.path.exists(os.path.split(save_path1)[0]):
                 os.makedirs(os.path.split(save_path1)[0])
 
-            # Load component
+            # Load components and mask
             if not os.path.exists(save_path1):
-                self.component1, self.mask1 = self.extract_component(np_image1)
+                print('Extracting components 1 and mask 1 ...')
+                self.component1, self.mask1 = extract_component_from_image(np_image1)
                 cv2.imwrite(save_path1, self.mask1)
             else:
+                print('Loading components 1 and mask 1 ...')
                 self.mask1 = cv2.imread(save_path1, cv2.IMREAD_GRAYSCALE)
                 self.component1 = extract_component_from_mask(self.mask1)
 
             if not os.path.exists(save_path2):
-                self.component2, self.mask2 = self.extract_component(np_image2)
+                print('Extracting components 2 and mask 2 ...')
+                self.component2, self.mask2 = extract_component_from_image(np_image2)
                 cv2.imwrite(save_path2, self.mask2)
             else:
+                print('Loading components 2 and mask 2 ...')
                 self.mask2 = cv2.imread(save_path2, cv2.IMREAD_GRAYSCALE)
                 self.component2 = extract_component_from_mask(self.mask2)
 
             # Load labeled pairs of components
-            logging.info('Load Previous Labels ...')
+            print('Loading json ...')
             full_output_dir = os.path.join(cut_dir, 'annotations', "%s.json" % (img_name1 + '__' + img_name2))
             if os.path.exists(full_output_dir):
                 lf = LabelFile()
@@ -1014,7 +946,14 @@ class MainWindow(QMainWindow, WindowMixin):
                 except LabelFileError as e:
                     self.errorMessage('Error saving label data', '<b>%s</b>' % e)
             else:
-                self.canvas2.pairs = predict_matching(self.component1, self.component2)
+                # self.canvas2.pairs = predict_matching(self.component1, self.component2)
+                self.canvas2.pairs = ucn_matching(np_image1,
+                                                  np_image2,
+                                                  self.mask1,
+                                                  self.component1,
+                                                  self.mask2,
+                                                  self.component2)
+                print(self.canvas2.pairs)
 
             self.image1 = image1
             self.filename1 = filename1
@@ -1035,7 +974,9 @@ class MainWindow(QMainWindow, WindowMixin):
             # self.paintCanvas()
             self.addRecentFile(self.filename1)
             # self.toggleActions(True)
+
             return True
+
         return False
 
     # def resizeEvent(self, event):
@@ -1073,6 +1014,7 @@ class MainWindow(QMainWindow, WindowMixin):
         return w1 / w2 if a2 >= a1 else h1 / h2
 
     def loadRecent(self, filename):
+        logging.info('Load Recent File')
         if self.mayContinue():
             self.loadFile(filename)
 
@@ -1160,7 +1102,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.close()
 
     def closeFile(self, _value=False):
-        print(10 * '-' + ' Close file ' + 10 * '-')
+        logging.info('Close file')
         if not self.mayContinue():
             return
         self.resetState()

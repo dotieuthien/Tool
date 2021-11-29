@@ -4,6 +4,12 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from functools import partial
 from pycpd import AffineRegistration, DeformableRegistration, RigidRegistration
+from matching_components.match_components_by_ucn import MatchingComponents
+from components import extract_component_from_image
+import torch
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+UCN_object = MatchingComponents(device=device, weight_path='/home/hades/Desktop/prj_toei_colorization/backend/app/ai_core_v2/matching_components/checkpoints/model_010.pth')
 
 
 def matching_by_cpd(src_points, tg_points):
@@ -89,6 +95,22 @@ def predict_matching(coms1, coms2):
                     pass
 
     return pairs
+
+
+def ucn_matching(left_img, right_img, left_mask, left_components, right_mask, right_components):
+    output_pairs = {}
+    # Left is tgt and right is reference
+    ucn_pairs, ucn_distance = UCN_object.process(right_img, left_img, right_mask, right_components, left_mask, left_components)
+
+    for tgt_id, ref_id in ucn_pairs.items():
+        tgt_id = tgt_id - 1
+        ref_id = ref_id[0] - 1
+        key = str(tgt_id) + '_' + str(ref_id)
+        value = {'left': int(tgt_id), 'right': int(ref_id)}
+        output_pairs[key] = value
+
+    return output_pairs
+
 
 
 

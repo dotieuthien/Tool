@@ -1,0 +1,8 @@
+labelme/matching_components/checkpoints
+labelme/__pycache__/
+.idea/
+labelme.egg-info/
+build/
+labelme/resources.py
+labelme/matching_components/__pycache__/
+

@@ -72,27 +72,35 @@ def extract_component_from_image(image):
             if region['area'] <= 10:
                 continue
 
-            result[index] = {"centroid": np.array(region.centroid), "area": region.area,
-                             "image": region.image.astype(np.uint8) * 255, "label": index + 1,
-                             "coords": region.coords, "bbox": region.bbox, "min_intensity": region.min_intensity,
-                             "mean_intensity": region.mean_intensity, "max_intensity": region.max_intensity}
+            result[index] = {"centroid": np.array(region.centroid),
+                             "area": region.area,
+                             "image": region.image.astype(np.uint8) * 255,
+                             "label": index + 1,
+                             "coords": region.coords,
+                             "bbox": region.bbox,
+                             "min_intensity": region.min_intensity,
+                             "mean_intensity": region.mean_intensity,
+                             "max_intensity": region.max_intensity}
             mask[region['coords'][:, 0], region['coords'][:, 1]] = index
             index += 1
+    print('Len of components ', len(result))
     return result, mask
 
 
 def extract_component_from_mask(mask):
     result = {}
-    labels = mask
-    index = 0
+    labels = mask + 1
     for region in measure.regionprops(labels, intensity_image=mask):
-        if region['area'] <= 10:
-            continue
+        index = region.max_intensity
+        result[index] = {"centroid": np.array(region.centroid),
+                         "area": region.area,
+                         "image": region.image.astype(np.uint8) * 255,
+                         "label": index + 1,
+                         "coords": region.coords,
+                         "bbox": region.bbox,
+                         "min_intensity": region.min_intensity,
+                         "mean_intensity": region.mean_intensity,
+                         "max_intensity": region.max_intensity}
 
-        result[index] = {"centroid": np.array(region.centroid), "area": region.area,
-                         "image": region.image.astype(np.uint8) * 255, "label": index + 1,
-                         "coords": region.coords, "bbox": region.bbox, "min_intensity": region.min_intensity,
-                         "mean_intensity": region.mean_intensity, "max_intensity": region.max_intensity}
-        mask[region['coords'][:, 0], region['coords'][:, 1]] = index
-        index += 1
+    print('Len of components ', len(result))
     return result
