@@ -270,7 +270,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.scaleFactor = 1
 
         # Group zoom controls into a list for easier toggling
-        zoomActions = (self.zoomWidget, zoomIn, zoomOut, zoomOrg, fitWindow)
+        zoomActions = (self.zoomWidget, zoomIn, zoomOut, zoomOrg)
         self.zoomMode = self.MANUAL_ZOOM
 
         self.scalers = {self.FIT_WINDOW: self.scaleFitWindow,
@@ -310,7 +310,7 @@ class MainWindow(QMainWindow, WindowMixin):
                               zoomIn=zoomIn,
                               zoomOut=zoomOut,
                               zoomOrg=zoomOrg,
-                              fitWindow=fitWindow,
+                              # fitWindow=fitWindow,
                               zoomActions=zoomActions,
                               fileMenuActions=(open_file, quit),
                               beginner=(), advanced=(),
@@ -328,7 +328,7 @@ class MainWindow(QMainWindow, WindowMixin):
                             imageList=imageMenu)
 
         addActions(self.menus.file, (open_file, quit))
-        addActions(self.menus.view, (labels, zoomIn, zoomOut, zoomOrg, fitWindow))
+        addActions(self.menus.view, (labels, zoomIn, zoomOut, zoomOrg))
         addActions(self.menus.help, (help,))
 
         self.menus.file.aboutToShow.connect(self.updateFileMenu)
@@ -521,7 +521,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.zoomIn.setEnabled(True)
         self.actions.zoomOut.setEnabled(True)
         self.actions.zoomOrg.setEnabled(True)
-        self.actions.fitWindow.setEnabled(True)
+        # self.actions.fitWindow.setEnabled(True)
 
         self.canvas2.mode = 0
         self.actions.confirm_create.setEnabled(False)
@@ -540,7 +540,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.zoomIn.setEnabled(True)
         self.actions.zoomOut.setEnabled(True)
         self.actions.zoomOrg.setEnabled(True)
-        self.actions.fitWindow.setEnabled(True)
+        # self.actions.fitWindow.setEnabled(True)
 
         self.canvas2.mode = 2
         self.actions.confirm_create.setEnabled(False)
@@ -563,7 +563,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.zoomIn.setEnabled(True)
         self.actions.zoomOut.setEnabled(True)
         self.actions.zoomOrg.setEnabled(True)
-        self.actions.fitWindow.setEnabled(True)
+        # self.actions.fitWindow.setEnabled(True)
 
         self.canvas2.mode = 1
         self.actions.confirm_create.setEnabled(False)
@@ -716,7 +716,7 @@ class MainWindow(QMainWindow, WindowMixin):
     #     self.updateProgress()
 
     def addZoom(self, factor):
-        logging.info('Add Zoom with factor %f' %factor)
+        logging.info('Add Zoom with factor %f' % factor)
         if self.scaleFactor + factor <= 0:
             return
 
@@ -746,8 +746,26 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def setOrgSize(self):
         logging.info('Set Origin Size')
+        self.scaleFactor = 1
+
         self.canvas2.scrollAreaLeft.setWidgetResizable(False)
         self.canvas2.scrollAreaRight.setWidgetResizable(False)
+
+        # Load origin pixmap
+        image1 = QImage(self.imageData1.data, self.imageData1.shape[1], self.imageData1.shape[0],
+                        self.imageData1.strides[0], QImage.Format_RGB888)
+
+        image2 = QImage(self.imageData2.data, self.imageData2.shape[1], self.imageData2.shape[0],
+                        self.imageData2.strides[0], QImage.Format_RGB888)
+
+        self.canvas2.loadPixmapLeft(QPixmap.fromImage(image1))
+        self.canvas2.loadPixmapRight(QPixmap.fromImage(image2))
+
+        # Scale canvas
+        h, w = self.imageData1.shape[0], self.imageData1.shape[1]
+        self.canvas2.pixmapLeft = self.canvas2.pixmapLeft.scaled(w, h)
+        self.canvas2.pixmapRight = self.canvas2.pixmapRight.scaled(w, h)
+
         self.canvas2.imageLabelLeft.adjustSize()
         self.canvas2.imageLabelRight.adjustSize()
 
