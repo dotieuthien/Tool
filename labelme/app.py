@@ -1,5 +1,6 @@
 import argparse
 import os.path
+from pathlib import Path
 import re
 import sys
 import subprocess
@@ -39,7 +40,7 @@ from labelme.labelFile import LabelFile, LabelFileError
 from labelme.toolBar import ToolBar
 from labelme.canvas2 import Canvas2
 from labelme.matching import predict_matching, ucn_matching
-from labelme.components import extract_component_from_mask, extract_component_from_image
+from labelme.components import extract_component_from_mask, extract_component_from_image, extract_component_from_sketch
 
 
 __appname__ = 'LabelComponent'
@@ -796,32 +797,77 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def openFile(self, _value=False):
         logging.info('Open File and Load New Cut')
-
         dialog = QFileDialog()
-        self.datadir = dialog.getExistingDirectory(self, 'Select an directory')
 
-        # All cuts in data dir
-        list_cut = natsorted(glob.glob(os.path.join(self.datadir, 'color')))
-        if len(list_cut) == 0:
-            return
+        # # Option 1
+        # # File Dialog for user to get the data directory
+        # self.datadir = dialog.getExistingDirectory(self, 'Select an directory')
+        #
+        # # All cuts in data dir
+        # list_cut = natsorted(glob.glob(os.path.join(self.datadir, 'color')))
+        #
+        # if len(list_cut) == 0:
+        #     return
+        #
+        # list_pair = []
+        # types = ['png', 'jpg', 'jpeg', 'tga', 'TGA']
+        #
+        # for cut in list_cut:
+        #     list_img_in_cut = []
+        #
+        #     for type in types:
+        #         list_img_in_cut.extend(glob.glob(os.path.join(cut, '*.' + type)))
+        #     list_img_in_cut = natsorted(list_img_in_cut)
+        #
+        #     num_img = len(list_img_in_cut)
+        #     num_pair = num_img - 1
+        #     for i in range(num_pair):
+        #         pair = [list_img_in_cut[i], list_img_in_cut[i + 1]]
+        #         list_pair.append(pair)
+        #
+        # self.list_pair = list_pair
 
-        list_pair = []
-        types = ['png', 'jpg', 'jpeg', 'tga', 'TGA']
+        # Option 2
+        # User will choose 2 images instead of choosing a folder (cut)
+        # Left is target sketch, right is reference
+        img_path1 = dialog.getOpenFileName(self, 'Select left image - sketch image')[0]
+        parts1 = Path(img_path1).parts
+        cut_name_1 = parts1[-3]
+        if parts1[-2] != 'sketch':
+            self.errorMessage(
+                'Error opening file',
+                '<p>Make sure <i>{0}</i> is a valid image file.<br/>'
+                'Left image is sketch image which in sketch folder'
+                .format(parts1[-1]))
 
-        for cut in list_cut:
-            list_img_in_cut = []
+            self.status("Error reading sketch %s" % img_path1)
+            return False
 
-            for type in types:
-                list_img_in_cut.extend(glob.glob(os.path.join(cut, '*.' + type)))
-            list_img_in_cut = natsorted(list_img_in_cut)
+        img_path2 = dialog.getOpenFileName(self, 'Select right image - reference sketch image')[0]
+        parts2 = Path(img_path2).parts
+        cut_name_2 = parts2[-3]
 
-            num_img = len(list_img_in_cut)
-            num_pair = num_img - 1
-            for i in range(num_pair):
-                pair = [list_img_in_cut[i], list_img_in_cut[i + 1]]
-                list_pair.append(pair)
+        if cut_name_2 != cut_name_1:
+            self.errorMessage(
+                'Error opening file',
+                '<p>Make sure <i>{0}</i> is a valid image file.<br/>'
+                'Right image is sketch of reference which in the same cut with left image'
+                .format(parts1[-1]))
 
-        self.list_pair = list_pair
+            self.status("Error reading sketch %s" % img_path2)
+            return False
+
+        if parts2[-2] != 'sketch':
+            self.errorMessage(
+                'Error opening file',
+                '<p>Make sure <i>{0}</i> is a valid image file.<br/>'
+                'Right image is sketch of reference which in sketch folder'
+                .format(parts1[-1]))
+
+            self.status("Error reading sketch %s" % img_path2)
+            return False
+
+        self.list_pair = [[img_path1, img_path2]]
 
         # Add list pair to show in bottom-right dock
         self.imageList.clear()
@@ -860,18 +906,10 @@ class MainWindow(QMainWindow, WindowMixin):
             filename = self.settings.get('filename', '')
 
         filename1, filename2 = filename
-        label_filename = os.path.join(os.path.split(filename1)[0],
-                                      'annotations',
-                                      os.path.basename(filename1)[:-4] + '__' + os.path.basename(filename2)[:-4] + '.json')
 
         if QFile.exists(filename1) and QFile.exists(filename2):
             self.imageData1 = np.array(Image.open(filename1).convert('RGB'))
             self.imageData2 = np.array(Image.open(filename2).convert('RGB'))
-
-            if os.path.exists(label_filename):
-                self.labelFile = LabelFile(label_filename)
-            else:
-                self.labelFile = None
 
             image1 = QImage(self.imageData1.data, self.imageData1.shape[1], self.imageData1.shape[0],
                             self.imageData1.strides[0], QImage.Format_RGB888)
@@ -908,11 +946,15 @@ class MainWindow(QMainWindow, WindowMixin):
             np_image1 = self.imageData1
             np_image2 = self.imageData2
 
-            cut_dir = os.path.split(filename1)[0]
+            cut_dir = ''
+            for p in Path(filename1).parts[0:-2]:
+                cut_dir = os.path.join(cut_dir, p)
+
             img_name1 = os.path.basename(filename1)[:-4]
             img_name2 = os.path.basename(filename2)[:-4]
-            save_path1 = os.path.join(cut_dir, 'annotations', '%s.png' % img_name1)
-            save_path2 = os.path.join(cut_dir, 'annotations', '%s.png' % img_name2)
+
+            save_path1 = os.path.join(cut_dir, 'annotations', 'sketch_%s.png' % img_name1)
+            save_path2 = os.path.join(cut_dir, 'annotations', 'sketch_%s.png' % img_name2)
 
             if not os.path.exists(os.path.split(save_path1)[0]):
                 os.makedirs(os.path.split(save_path1)[0])
@@ -920,40 +962,40 @@ class MainWindow(QMainWindow, WindowMixin):
             # Load components and mask
             if not os.path.exists(save_path1):
                 print('Extracting components 1 and mask 1 ...')
-                self.component1, self.mask1 = extract_component_from_image(np_image1)
-                cv2.imwrite(save_path1, self.mask1)
+                # self.component1, self.mask1 = extract_component_from_image(np_image1)
+                self.component1, self.mask1, label_mask1 = extract_component_from_sketch(np_image1)
+                cv2.imwrite(save_path1, label_mask1)
             else:
                 print('Loading components 1 and mask 1 ...')
-                self.mask1 = cv2.imread(save_path1, cv2.IMREAD_GRAYSCALE)
-                self.component1 = extract_component_from_mask(self.mask1)
+                label_mask1 = cv2.imread(save_path1, cv2.IMREAD_GRAYSCALE)
+                self.component1, self.mask1 = extract_component_from_mask(label_mask1)
 
             if not os.path.exists(save_path2):
                 print('Extracting components 2 and mask 2 ...')
-                self.component2, self.mask2 = extract_component_from_image(np_image2)
-                cv2.imwrite(save_path2, self.mask2)
+                self.component2, self.mask2, label_mask2 = extract_component_from_sketch(np_image2)
+                cv2.imwrite(save_path2, label_mask2)
             else:
                 print('Loading components 2 and mask 2 ...')
-                self.mask2 = cv2.imread(save_path2, cv2.IMREAD_GRAYSCALE)
-                self.component2 = extract_component_from_mask(self.mask2)
+                label_mask2 = cv2.imread(save_path2, cv2.IMREAD_GRAYSCALE)
+                self.component2, self.mask2 = extract_component_from_mask(label_mask2)
 
             # Load labeled pairs of components
-            print('Loading json ...')
-            full_output_dir = os.path.join(cut_dir, 'annotations', "%s.json" % (img_name1 + '__' + img_name2))
+            full_output_dir = os.path.join(cut_dir, 'annotations', "%s.json" % ('sketch_' + img_name1 + '__' + 'sketch_' + img_name2))
             if os.path.exists(full_output_dir):
+                print('Loading available json ...')
                 lf = LabelFile()
                 try:
                     self.canvas2.pairs = lf.load(full_output_dir)
                 except LabelFileError as e:
                     self.errorMessage('Error saving label data', '<b>%s</b>' % e)
             else:
-                # self.canvas2.pairs = predict_matching(self.component1, self.component2)
+                print('Estimate pairs ...')
                 self.canvas2.pairs = ucn_matching(np_image1,
                                                   np_image2,
-                                                  self.mask1,
+                                                  label_mask1,
                                                   self.component1,
-                                                  self.mask2,
+                                                  label_mask2,
                                                   self.component2)
-                print(self.canvas2.pairs)
 
             self.image1 = image1
             self.filename1 = filename1
@@ -1021,13 +1063,16 @@ class MainWindow(QMainWindow, WindowMixin):
     def saveLabels(self):
         logging.info('Save Labels')
         img_name_1, img_name_2 = self.list_pair[self.imgCnt]
-        cut_name = img_name_1.split('/')[-2]
+        cut_dir = ''
+        for p in Path(img_name_1).parts[0:-2]:
+            cut_dir = os.path.join(cut_dir, p)
+
         img_name_1, img_name_2 = os.path.basename(img_name_1).split('.')[0], os.path.basename(img_name_2).split('.')[0]
-        full_output_dir = os.path.join(self.datadir, cut_name, 'annotations')
+        full_output_dir = os.path.join(cut_dir, 'annotations')
 
         if not os.path.exists(full_output_dir):
             os.makedirs(full_output_dir)
-        out_fn = os.path.join(full_output_dir, "%s.json" % (img_name_1 + '__' + img_name_2))
+        out_fn = os.path.join(full_output_dir, "%s.json" % ('sketch_' + img_name_1 + '__' + 'sketch_' + img_name_2))
 
         # Save the result from the previous pair image
         self._saveLabels(out_fn)
