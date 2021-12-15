@@ -97,5 +97,4 @@ dependencies:
     - scipy==1.5.4
     - termcolor==1.1.0
     - tifffile==2020.9.3
-prefix: /home/hades/anaconda3/envs/labelme3
 
