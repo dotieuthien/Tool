@@ -111,12 +111,12 @@ def extract_component_from_image(image):
 
     index = 0
     result = {}
-    line_art_value = get_line_art_value(image)
+    # line_art_value = get_line_art_value(image)
 
     for unique in uniques:
         # Get coords by color
-        if unique == line_art_value:
-            continue
+        # if unique == line_art_value:
+        #     continue
         rows, cols = np.where(processed_image == unique)
         image_tmp = np.zeros_like(processed_image)
         image_tmp[rows, cols] = 255

@@ -851,7 +851,8 @@ class MainWindow(QMainWindow, WindowMixin):
         img_path1 = dialog.getOpenFileName(self, 'Select left image - sketch image')[0]
         parts1 = Path(img_path1).parts
         cut_name_1 = parts1[-3]
-        if parts1[-2] != 'sketch':
+
+        if parts1[-2] != 'color':
             self.errorMessage(
                 'Error opening file',
                 '<p>Make sure <i>{0}</i> is a valid image file.<br/>'
@@ -875,7 +876,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.status("Error reading sketch %s" % img_path2)
             return False
 
-        if parts2[-2] != 'sketch':
+        if parts2[-2] != 'color':
             self.errorMessage(
                 'Error opening file',
                 '<p>Make sure <i>{0}</i> is a valid image file.<br/>'
@@ -981,7 +982,8 @@ class MainWindow(QMainWindow, WindowMixin):
             if not os.path.exists(save_path1):
                 print('Extracting components 1 and mask 1 ...')
                 # self.component1, self.mask1 = extract_component_from_image(np_image1)
-                self.component1, self.mask1, label_mask1 = extract_component_from_sketch(np_image1)
+                # self.component1, self.mask1, label_mask1 = extract_component_from_sketch(np_image1)
+                self.component1, self.mask1, label_mask1 = extract_component_from_image(np_image1)
                 cv2.imwrite(save_path1, label_mask1)
             else:
                 print('Loading components 1 and mask 1 ...')
@@ -990,7 +992,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
             if not os.path.exists(save_path2):
                 print('Extracting components 2 and mask 2 ...')
-                self.component2, self.mask2, label_mask2 = extract_component_from_sketch(np_image2)
+                # self.component2, self.mask2, label_mask2 = extract_component_from_sketch(np_image2)
+                self.component2, self.mask2, label_mask2 = extract_component_from_image(np_image2)
                 cv2.imwrite(save_path2, label_mask2)
             else:
                 print('Loading components 2 and mask 2 ...')
@@ -1007,13 +1010,14 @@ class MainWindow(QMainWindow, WindowMixin):
                 except LabelFileError as e:
                     self.errorMessage('Error saving label data', '<b>%s</b>' % e)
             else:
-                print('Estimate pairs ...')
-                self.canvas2.pairs = ucn_matching(np_image1,
-                                                  np_image2,
-                                                  label_mask1,
-                                                  self.component1,
-                                                  label_mask2,
-                                                  self.component2)
+                # print('Estimate pairs ...')
+                # self.canvas2.pairs = ucn_matching(np_image1,
+                #                                   np_image2,
+                #                                   label_mask1,
+                #                                   self.component1,
+                #                                   label_mask2,
+                #                                   self.component2)
+                self.canvas2.pairs = {}
 
             self.image1 = image1
             self.filename1 = filename1
