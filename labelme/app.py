@@ -30,6 +30,9 @@ except ImportError:
     from PyQt4.QtCore import *
     PYQT5 = False
 
+import cgitb
+cgitb.enable(format='text')
+
 from labelme.lib import struct, newAction, newIcon, addActions, fmtShortcut
 from labelme.shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
 from labelme.zoomWidget import ZoomWidget
@@ -39,7 +42,7 @@ from labelme.colorDialog import ColorDialog
 from labelme.labelFile import LabelFile, LabelFileError
 from labelme.toolBar import ToolBar
 from labelme.canvas2 import Canvas2
-from labelme.matching import predict_matching, ucn_matching
+# from labelme.matching import predict_matching, ucn_matching
 from labelme.components import extract_component_from_mask, extract_component_from_image, extract_component_from_sketch
 
 
@@ -1008,12 +1011,13 @@ class MainWindow(QMainWindow, WindowMixin):
                     self.errorMessage('Error saving label data', '<b>%s</b>' % e)
             else:
                 print('Estimate pairs ...')
-                self.canvas2.pairs = ucn_matching(np_image1,
-                                                  np_image2,
-                                                  label_mask1,
-                                                  self.component1,
-                                                  label_mask2,
-                                                  self.component2)
+                self.canvas2.pairs = {}
+                # self.canvas2.pairs = ucn_matching(np_image1,
+                #                                   np_image2,
+                #                                   label_mask1,
+                #                                   self.component1,
+                #                                   label_mask2,
+                #                                   self.component2)
 
             self.image1 = image1
             self.filename1 = filename1
@@ -1309,7 +1313,8 @@ def main():
     win = MainWindow(filename, output)
     win.show()
     win.raise_()
-    sys.exit(app.exec_())
+    app.exec_()
+    # sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
