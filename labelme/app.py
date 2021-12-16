@@ -39,7 +39,7 @@ from labelme.colorDialog import ColorDialog
 from labelme.labelFile import LabelFile, LabelFileError
 from labelme.toolBar import ToolBar
 from labelme.canvas2 import Canvas2
-from labelme.matching import predict_matching, ucn_matching
+# from labelme.matching import predict_matching, ucn_matching
 from labelme.components import extract_component_from_mask, extract_component_from_image, extract_component_from_sketch
 
 
