@@ -40,6 +40,7 @@ from labelme.labelFile import LabelFile, LabelFileError
 from labelme.toolBar import ToolBar
 from labelme.canvas2 import Canvas2
 # from labelme.matching import predict_matching, ucn_matching
+import imageio
 from labelme.components import extract_component_from_mask, extract_component_from_image, extract_component_from_sketch
 
 
@@ -984,20 +985,20 @@ class MainWindow(QMainWindow, WindowMixin):
                 # self.component1, self.mask1 = extract_component_from_image(np_image1)
                 # self.component1, self.mask1, label_mask1 = extract_component_from_sketch(np_image1)
                 self.component1, self.mask1, label_mask1 = extract_component_from_image(np_image1)
-                cv2.imwrite(save_path1, label_mask1)
+                imageio.imwrite(save_path1, label_mask1.astype(np.uint16))
             else:
                 print('Loading components 1 and mask 1 ...')
-                label_mask1 = cv2.imread(save_path1, cv2.IMREAD_GRAYSCALE)
+                label_mask1 = imageio.imread(save_path1)
                 self.component1, self.mask1 = extract_component_from_mask(label_mask1)
 
             if not os.path.exists(save_path2):
                 print('Extracting components 2 and mask 2 ...')
                 # self.component2, self.mask2, label_mask2 = extract_component_from_sketch(np_image2)
                 self.component2, self.mask2, label_mask2 = extract_component_from_image(np_image2)
-                cv2.imwrite(save_path2, label_mask2)
+                imageio.imwrite(save_path2, label_mask2.astype(np.uint16))
             else:
                 print('Loading components 2 and mask 2 ...')
-                label_mask2 = cv2.imread(save_path2, cv2.IMREAD_GRAYSCALE)
+                label_mask2 = imageio.imread(save_path2)
                 self.component2, self.mask2 = extract_component_from_mask(label_mask2)
 
             # Load labeled pairs of components
