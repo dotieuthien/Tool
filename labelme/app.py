@@ -33,9 +33,9 @@ except ImportError:
 from labelme.lib import struct, newAction, newIcon, addActions, fmtShortcut
 from labelme.shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
 from labelme.zoomWidget import ZoomWidget
-from labelme.labelDialog import LabelDialog
-from labelme.choiceDialog import ChoiceDialog
-from labelme.colorDialog import ColorDialog
+from labelme.dialogs.labelDialog import LabelDialog
+from labelme.dialogs.choiceDialog import ChoiceDialog
+from labelme.dialogs.colorDialog import ColorDialog
 from labelme.labelFile import LabelFile, LabelFileError
 from labelme.toolBar import ToolBar
 from labelme.canvas2 import Canvas2
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.screencastViewer = "firefox"
         self.screencast = "screencast.ogv"
 
-        # Dialog
+        # Dialogs
         self.labelDialog = LabelDialog(parent=self)
         self.choiceDialog = ChoiceDialog(parent=self)
         self.itemsToShapes = []
