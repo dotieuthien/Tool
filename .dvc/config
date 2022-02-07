@@ -1,0 +1,6 @@
+[core]
+    hardlink_lock = true
+['remote "geektoys"']
+    url = s3://ai-cv/geektoys
+['remote "toei"']
+    url = s3://ai-cv/toei
