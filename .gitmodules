@@ -1,0 +1,4 @@
+[submodule "colorization/hades_painting"]
+	path = colorization/hades_painting
+	url = git@github.com:DangDinhQuocTrung/hades_painting.git
+	branch = cain/eitl
