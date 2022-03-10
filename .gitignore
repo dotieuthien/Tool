@@ -9,3 +9,5 @@ labelme/matching_wrapper/__pycache__/
 labelme/files/__pycache__/
 labelme/config/__pycache__/
 labelme/widgets/__pycache__/
+
+data
