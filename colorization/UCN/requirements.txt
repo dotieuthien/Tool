@@ -1,0 +1,17 @@
+natsort
+tqdm
+numpy
+scipy
+opencv-python
+imgaug
+Pillow
+boto3
+torch==1.6.0
+torchvision==0.7.0
+tensorboardX
+scikit-image==0.15.0
+ninja
+yacs
+cython
+neptune-client
+psutil
