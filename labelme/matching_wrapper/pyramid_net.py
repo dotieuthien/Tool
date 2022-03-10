@@ -2,9 +2,9 @@ import torch
 from torch import nn
 from torch.nn import functional
 
-from labelme.matching_components.resnet import resnet34
-from labelme.matching_components.shallow_net_utils import get_coord_features
-from labelme.matching_components.shallow_net_utils import gather_by_one_hot_labels
+from labelme.matching_wrapper.resnet import resnet34
+from labelme.matching_wrapper.shallow_net_utils import get_coord_features
+from labelme.matching_wrapper.shallow_net_utils import gather_by_one_hot_labels
 
 
 def scaled_gather_by_labels(features, labels):

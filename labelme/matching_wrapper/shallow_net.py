@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from labelme.matching_components.shallow_net_utils import get_coord_features
-from labelme.matching_components.shallow_net_utils import gather_by_one_hot_labels, gather_by_label
+from labelme.matching_wrapper.shallow_net_utils import get_coord_features
+from labelme.matching_wrapper.shallow_net_utils import gather_by_one_hot_labels, gather_by_label
 
 
 class ConvolutionBlock(nn.Module):

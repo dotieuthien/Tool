@@ -3,42 +3,42 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from functools import partial
-from pycpd import AffineRegistration, DeformableRegistration, RigidRegistration
-from matching_components.match_components_by_ucn import MatchingComponents
-from components import extract_component_from_image
+# from pycpd import AffineRegistration, DeformableRegistration, RigidRegistration
+from matching_wrapper.match_components_by_ucn import MatchingComponents
+# from components import extract_component_from_image
 import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-UCN_object = MatchingComponents(device=device, weight_path='/home/hades/Desktop/prj_toei_colorization/backend/app/ai_core_v2/matching_components/checkpoints/model_010.pth')
+UCN_object = MatchingComponents(device=device, weight_path='colorization/UCN/pretrained-weights/model_010.pth')
 
 
-def matching_by_cpd(src_points, tg_points):
-    def visualize(iteration, error, X, Y, ax):
-        plt.cla()
-        ax.scatter(X[:, 0], X[:, 1], color='red', label='Target')
-        ax.scatter(Y[:, 0], Y[:, 1], color='blue', label='Source')
+# def matching_by_cpd(src_points, tg_points):
+#     def visualize(iteration, error, X, Y, ax):
+#         plt.cla()
+#         ax.scatter(X[:, 0], X[:, 1], color='red', label='Target')
+#         ax.scatter(Y[:, 0], Y[:, 1], color='blue', label='Source')
 
-        plt.text(0.87, 0.92, 'Iteration: {:d}\nQ: {:06.4f}'.format(iteration, error),
-                 horizontalalignment='center',
-                 verticalalignment='center',
-                 transform=ax.transAxes,
-                 fontsize='x-large')
+#         plt.text(0.87, 0.92, 'Iteration: {:d}\nQ: {:06.4f}'.format(iteration, error),
+#                  horizontalalignment='center',
+#                  verticalalignment='center',
+#                  transform=ax.transAxes,
+#                  fontsize='x-large')
 
-        ax.legend(loc='upper left', fontsize='x-large')
-        plt.draw()
-        plt.pause(0.001)
+#         ax.legend(loc='upper left', fontsize='x-large')
+#         plt.draw()
+#         plt.pause(0.001)
 
-    X = np.array(tg_points)
-    Y = np.array(src_points)
+#     X = np.array(tg_points)
+#     Y = np.array(src_points)
 
-    fig = plt.figure()
-    fig.add_axes([0, 0, 1, 1])
-    # callback = partial(visualize, ax=fig.axes[0])
+#     fig = plt.figure()
+#     fig.add_axes([0, 0, 1, 1])
+#     # callback = partial(visualize, ax=fig.axes[0])
 
-    reg = AffineRegistration(**{'X': X, 'Y': Y})
-    reg.register(None)
-    P = reg.P
-    return P
+#     reg = AffineRegistration(**{'X': X, 'Y': Y})
+#     reg.register(None)
+#     P = reg.P
+#     return P
 
 
 def get_centroid_from_id(id_list, coms):
@@ -97,7 +97,14 @@ def predict_matching(coms1, coms2):
     return pairs
 
 
-def ucn_matching(left_img, right_img, left_mask, left_components, right_mask, right_components):
+def ucn_matching(
+        left_img, 
+        right_img, 
+        left_mask, 
+        left_components, 
+        right_mask, 
+        right_components):
+
     output_pairs = {}
     # Left is tgt and right is reference
     ucn_pairs, ucn_distance = UCN_object.process(right_img, left_img, right_mask, right_components, left_mask, left_components)

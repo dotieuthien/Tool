@@ -4,4 +4,8 @@ labelme/__pycache__/
 labelme.egg-info/
 build/
 labelme/resources.py
-labelme/matching_components/__pycache__/
+
+labelme/matching_wrapper/__pycache__/
+labelme/files/__pycache__/
+labelme/config/__pycache__/
+labelme/widgets/__pycache__/

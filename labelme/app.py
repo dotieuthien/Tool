@@ -1,26 +1,26 @@
+# Add PYTHONPATH
+import sys
+sys.path.append('./')
+
 import argparse
 import os.path
 from pathlib import Path
 import re
 import sys
 import subprocess
-import glob
 from natsort import natsorted
-import cv2
 from skimage import measure
 import numpy as np
 from functools import partial
 from collections import defaultdict
-from constants import class_names
 import matplotlib.pyplot as plt
 from PIL import Image
+import imageio
 import logging
 logging.basicConfig(level=logging.INFO)
 
 try:
-    # Graphical user interface components
     from PyQt5.QtGui import *
-    # Core non-GUI classes used by other modules
     from PyQt5.QtCore import *
     from PyQt5.QtWidgets import *
     from PyQt5.QtPrintSupport import QPrinter
@@ -30,18 +30,24 @@ except ImportError:
     from PyQt4.QtCore import *
     PYQT5 = False
 
-from labelme.lib import struct, newAction, newIcon, addActions, fmtShortcut
-from labelme.shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
-from labelme.zoomWidget import ZoomWidget
-from labelme.dialogs.labelDialog import LabelDialog
-from labelme.dialogs.choiceDialog import ChoiceDialog
-from labelme.dialogs.colorDialog import ColorDialog
-from labelme.labelFile import LabelFile, LabelFileError
-from labelme.toolBar import ToolBar
-from labelme.canvas2 import Canvas2
-# from labelme.matching import predict_matching, ucn_matching
-import imageio
-from labelme.components import extract_component_from_mask, extract_component_from_image, extract_component_from_sketch
+from labelme.config.config_utils import *
+
+from labelme.utils.constants import class_names
+from labelme.utils.lib import struct, newAction, newIcon, addActions, fmtShortcut
+from labelme.utils.shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
+from labelme.utils.label_file import LabelFile, LabelFileError
+from labelme.utils.components import extract_component_from_mask, extract_component_from_image, extract_component_from_sketch
+from labelme.utils.matching import ucn_matching
+
+from labelme.widgets.tool_bar import ToolBar
+from labelme.widgets.zoom_widget import ZoomWidget
+from labelme.widgets.label_dialog import LabelDialog
+from labelme.widgets.choice_dialog import ChoiceDialog
+from labelme.widgets.color_dialog import ColorDialog
+from labelme.widgets.canvas2 import Canvas2
+
+from labelme.files.s3 import *
+from colorization.UCN.sagemaker_run import main as run_training_job
 
 
 __appname__ = 'LabelComponent'
@@ -53,32 +59,56 @@ class WindowMixin(object):
     # inherit from self.__dict__ --> QMainWindow
     def menu(self, title, actions=None):
         menu = self.menuBar().addMenu(title)
+
         if actions:
             addActions(menu, actions)
+
         return menu
 
     def toolbar(self, title, actions=None):
         toolbar = ToolBar(title)
         toolbar.setObjectName('%sToolBar' % title)
         toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+
         if actions:
             addActions(toolbar, actions)
         self.addToolBar(Qt.LeftToolBarArea, toolbar)
+
         return toolbar
 
 
 class MainWindow(QMainWindow, WindowMixin):
-    # The QMainWindow class provides a main application window.
-    # This enables to create a classic application skeleton with a status bar, toolbars, and a menu bar
+    """
+    Args:
+        QMainWindow (class): The QMainWindow class provides a main application window 
+        this enables to create a classic application skeleton with a status bar, toolbars, and a menu bar
+        WindowMixin (class): 
+    """
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = 0, 1, 2
 
-    def __init__(self, filename=None, output=None):
+    def __init__(self, filename=None, output=None, config_file=None):
         super(MainWindow, self).__init__()
         self.setWindowTitle(__appname__)
 
-        # Whether we need to save or not
+        # Load config file
+        print('Get the config from %s' % config_file)
+        config = convert_to_object(load_config(config_file))
+
+        # Initialize S3
+        self.s3_resource = init_s3_object(
+            'ai-cv', 
+            config.aws_region, 
+            config.aws_access_key, 
+            config.aws_secret_access_key,
+        )
+
+        # TODO: Initialize database
+
+        # Whether we need to save or not.
         self.dirty = False
+
         self._noSelectionSlot = False
+
         self._beginner = True
 
         # Help
@@ -97,8 +127,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.labelList.itemSelectionChanged.connect(self.clickLabel)
         self.imageList.itemSelectionChanged.connect(self.clickImage)
 
-        self.viewButton = QToolButton()
         # Style of button, icon and text, with text beside the icon
+        self.viewButton = QToolButton()
         self.viewButton.setToolButtonStyle(Qt.ToolButtonFollowStyle)
         self.viewButton.setText("All")
 
@@ -139,18 +169,18 @@ class MainWindow(QMainWindow, WindowMixin):
         self.zoomWidget = ZoomWidget()
         self.colorDialog = ColorDialog(parent=self)
 
-        # Canvas init
+        # Canvas2 init
         self.canvas2 = Canvas2(window=self)
         self.setCentralWidget(self.canvas2.centralWidget)
 
-        # Actions
+        # Initialize actions 
         action = partial(newAction, self)
 
-        createMode = action('Create Mode',
+        createMode = action('&Create Mode',
                             self.setCreateMode,
                             'C',
                             'objects',
-                            'Mode create new matching pairs of component', enabled=False)
+                            'Activate mode for creating new matching pairs of component', enabled=False)
 
         viewMode = action('&View Mode',
                           self.setViewMode,
@@ -162,7 +192,7 @@ class MainWindow(QMainWindow, WindowMixin):
                               self.sub_ViewMode,
                               'V',
                               'view',
-                              'Mode view pairs of component', enabled=False)
+                              'Sub-function for view mode', enabled=False)
 
         self.viewButton.setDefaultAction(sub_ViewMode)
 
@@ -197,18 +227,18 @@ class MainWindow(QMainWindow, WindowMixin):
                            'Save labels',
                            enabled=False)
 
-        next_image = action('&Next Image',
-                            self.nextImage,
+        upload_label = action('&Upload label to S3',
+                            self.upload_label_to_s3,
                             'Ctrl+D',
                             'next',
-                            'Next pair image',
+                            'Upload new label to S3',
                             enabled=False)
 
-        prev_image = action('&Prev Image',
-                            self.prevImage,
+        train_sagemaker = action('&Train UCN on SageMaker',
+                            self.train_ucn_sagemaker,
                             'Ctrl+A',
                             'prev',
-                            'Prev pair image',
+                            'Create training job on SageMaker',
                             enabled=False)
 
         confirm_delete = action('&Confirm Delete',
@@ -305,8 +335,8 @@ class MainWindow(QMainWindow, WindowMixin):
                               sub_ViewMode=sub_ViewMode,
                               advancedMode=advancedMode,
                               deleteMode=deleteMode,
-                              next_image=next_image,
-                              prev_image=prev_image,
+                              upload_label=upload_label,
+                              train_sagemaker=train_sagemaker,
                               zoom=zoom,
                               zoomIn=zoomIn,
                               zoomOut=zoomOut,
@@ -340,7 +370,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.actions.advanced = (save_next, confirm_create, confirm_delete, None,
                                  createMode, deleteMode, viewMode, None,
-                                 next_image, prev_image)
+                                 upload_label, train_sagemaker)
 
         self.statusBar().showMessage('%s started' % __appname__)
         self.statusBar().show()
@@ -383,8 +413,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.InitActions()
 
-    # def noShapes(self):
-    #     return not self.itemsToShapes
+    # Support functions
 
     def resetState(self):
         logging.info('Reset Main')
@@ -427,15 +456,15 @@ class MainWindow(QMainWindow, WindowMixin):
     # def setDirty(self):
     #     self.dirty = True
     #     self.actions.save.setEnabled(True)
-    #
+    
     def setClean(self):
         self.dirty = False
         # self.actions.save.setEnabled(False)
         self.actions.create.setEnabled(True)
 
     def toggleActions(self, value=True):
-        """
-        Enable/Disable widgets which depend on an opened image
+        """Enable/Disable widgets which depend on an opened image
+
         """
         for z in self.actions.zoomActions:
             z.setEnabled(value)
@@ -464,8 +493,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas2.update()
 
     def currentItem(self):
-        """
-        Return list current label
+        """Return current label list
+
         """
         # List of all selected items in the list widget
         items = self.labelList.selectedItems()
@@ -482,12 +511,6 @@ class MainWindow(QMainWindow, WindowMixin):
         elif len(self.recentFiles) >= self.maxRecent:
             self.recentFiles.pop()
         self.recentFiles.insert(0, filename)
-
-    # def beginner(self):
-    #     return self._beginner
-    #
-    # def advanced(self):
-    #     return not self.beginner()
 
     def tutorial(self):
         subprocess.Popen([self.screencastViewer, self.screencast])
@@ -905,8 +928,8 @@ class MainWindow(QMainWindow, WindowMixin):
         # self.loadFile(self.list_pair[self.imgCnt])
 
         # Init actions
-        self.actions.next_image.setEnabled(True)
-        self.actions.prev_image.setEnabled(True)
+        self.actions.upload_label.setEnabled(True)
+        self.actions.train_sagemaker.setEnabled(True)
 
         self.canvas2.scrollAreaLeft.setVisible(True)
         self.canvas2.scrollAreaRight.setVisible(True)
@@ -1011,14 +1034,12 @@ class MainWindow(QMainWindow, WindowMixin):
                 except LabelFileError as e:
                     self.errorMessage('Error saving label data', '<b>%s</b>' % e)
             else:
-                # print('Estimate pairs ...')
-                # self.canvas2.pairs = ucn_matching(np_image1,
-                #                                   np_image2,
-                #                                   label_mask1,
-                #                                   self.component1,
-                #                                   label_mask2,
-                #                                   self.component2)
-                self.canvas2.pairs = {}
+                self.canvas2.pairs = ucn_matching(np_image1,
+                                                  np_image2,
+                                                  self.mask1,
+                                                  self.component1,
+                                                  self.mask2,
+                                                  self.component2)
 
             self.image1 = image1
             self.filename1 = filename1
@@ -1044,11 +1065,47 @@ class MainWindow(QMainWindow, WindowMixin):
 
         return False
 
-    # def resizeEvent(self, event):
-    #     if self.canvas2 and not self.image.isNull() and self.zoomMode != self.MANUAL_ZOOM:
-    #         self.adjustScale()
-    #     super(MainWindow, self).resizeEvent(event)
+    # Atts for data management utils
+    # ------------------------------------------------------------------------------------
+    def dowload_image_from_s3(self):
+        pass
 
+    def upload_label_to_s3(self):
+        """Get the curent label file name and then upda load to S3
+        """
+        # Current image name
+        img_name_1, img_name_2 = self.list_pair[self.imgCnt]
+        cut_dir = ''
+        for p in Path(img_name_1).parts[0:-2]:
+            cut_dir = os.path.join(cut_dir, p)
+
+        img_name_1, img_name_2 = os.path.basename(img_name_1).split('.')[0], os.path.basename(img_name_2).split('.')[0]
+        full_output_dir = os.path.join(cut_dir, 'annotations')
+        full_label_file = os.path.join(full_output_dir, "%s.json" % ('sketch_' + img_name_1 + '__' + 'sketch_' + img_name_2))
+        
+        if not os.path.exists(full_label_file):
+            return
+
+        # Path to S3
+        cut_name = os.path.basename(cut_dir)
+        img_name_1, img_name_2 = os.path.basename(img_name_1).split('.')[0], os.path.basename(img_name_2).split('.')[0]
+        s3_file = 'hades/toei-all-train' + "/" + cut_name + "/" + 'annotations' + "/" + ("%s.json" % ('sketch_' + img_name_1 + '__' + 'sketch_' + img_name_2))
+        upload_file_to_s3(self.s3_resource, 'ai-cv', full_label_file, s3_file)
+
+    def get_db(self):
+        pass
+
+    def update_db(self):
+        pass
+
+    def train_ucn_sagemaker(self):
+        """Create checkpoints dir in S3 to create a training job from scratch
+        """
+        print('Create training job on SageMaker')
+        run_training_job()
+
+    # ------------------------------------------------------------------------------------
+    
     def paintCanvas(self):
         assert not self.image1.isNull(), "Cannot paint null image"
         self.canvas2.scale = 0.01 * self.zoomWidget.value()
@@ -1303,15 +1360,15 @@ def main():
     parser.add_argument('-O', '--output', help='output label name')
     args = parser.parse_args()
 
-    filename = ['./icon/hades.png',
-                './icon/hades.png']
+    filename = ['labelme/icon/hades.png',
+                'labelme/icon/hades.png']
     output = "."
 
     app = QApplication(sys.argv)
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon("app"))
 
-    win = MainWindow(filename, output)
+    win = MainWindow(filename, output, config_file='labelme/config/hades_config.ini')
     win.show()
     win.raise_()
     sys.exit(app.exec_())

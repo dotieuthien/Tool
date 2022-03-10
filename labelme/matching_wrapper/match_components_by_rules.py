@@ -577,7 +577,7 @@ def resize_mask(mask, components, size, mapping):
     removed_labels = [i for i in old_labels if (i not in after_remove_labels) and (i > 0)]
 
     for i in removed_labels:
-        component = components[i - 1]
+        component = components[int(i - 1)]
         new_mask = rectify_mask(new_mask, component, ratio)
 
     # check correctness, if good then return

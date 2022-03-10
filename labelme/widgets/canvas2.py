@@ -14,7 +14,7 @@ except ImportError:
     from PyQt4.QtCore import *
     PYQT5 = False
 
-from labelme.shape import Shape
+from labelme.utils.shape import Shape
 import matplotlib.pyplot as plt
 
 

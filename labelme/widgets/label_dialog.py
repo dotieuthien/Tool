@@ -9,7 +9,7 @@ except ImportError:
     from PyQt4.QtCore import *
     PYQT5 = False
 
-from labelme.lib import newIcon, labelValidator
+from labelme.utils.lib import newIcon, labelValidator
 
 BB = QDialogButtonBox
 

@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from labelme.matching_components.match_components_by_rules import *
-from labelme.matching_components.shallow_net import UNet
-from labelme.matching_components.pyramid_net import UNet as PNet
+from labelme.matching_wrapper.match_components_by_rules import *
+from labelme.matching_wrapper.shallow_net import UNet
+from labelme.matching_wrapper.pyramid_net import UNet as PNet
 
 
 class MatchingComponents:
